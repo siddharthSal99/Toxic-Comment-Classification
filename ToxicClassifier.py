@@ -17,107 +17,106 @@ from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.svm import SVC, LinearSVC, NuSVC
 from nltk.classify import ClassifierI
 import time
+from nltk.corpus import stopwords;
 
 
 # In[2]:
 
-class VoteClassifier(ClassifierI):
-    def __init__(self, *classifiers):
-        self._classifiers = classifiers
+# In[ ]:
 
-    def classify(self, features):
-        votes = []
-        for c in self._classifiers:
-            v = c.classify(features)
-            votes.append(v)
-        return mode(votes)
-
-    def confidence(self, features):
-        votes = []
-        for c in self._classifiers:
-            v = c.classify(features)
-            votes.append(v)
-
-        choice_votes = votes.count(mode(votes))
-        conf = choice_votes / len(votes)
-        return conf
+# training_data = 'TrainingData.xlsx'
+# testing_data = 'TestingData.xlsx'
+# train_xl = pd.ExcelFile(training_data)
+# sheet_names = train_xl.sheet_names
+# sheet_names[0]
+# df = train_xl.parse('train')
+# df.to_pickle('training_data.pkl')
+# df.iloc[1:15]
 
 
 # In[ ]:
 
-training_data = 'TrainingData.xlsx'
-testing_data = 'TestingData.xlsx'
-train_xl = pd.ExcelFile(training_data)
-sheet_names = train_xl.sheet_names
-sheet_names[0]
-df = train_xl.parse('train')
-df.to_pickle('training_data.pkl')
-df.iloc[1:15]
-
-
-# In[ ]:
-
-dates = pd.date_range('1/1/2000', periods=8)
-df = pd.DataFrame(np.random.randn(8, 4), index=dates, columns=['A', 'B', 'C', 'D'])
-df.iloc[1,1]
+# dates = pd.date_range('1/1/2000', periods=8)
+# df = pd.DataFrame(np.random.randn(8, 4), index=dates, columns=['A', 'B', 'C', 'D'])
+# df.iloc[1,1]
 
 
 # In[4]:
 
-train_df = pd.read_pickle('training_data.pkl')
-#train_df.iloc[1:15]
-toxic_col = train_df['toxic']
-#toxic_col[1:15]
-toxic_comments = train_df.loc[toxic_col == 1]
-#toxic_comments[1:15]
-non_toxic_comments = train_df.loc[toxic_col == 0]
-#non_toxic_comments[1:15]
-toxic_comments.to_pickle('toxic_comments.pkl')
-non_toxic_comments.to_pickle('non_toxic_comments')
+# train_df = pd.read_pickle('training_data.pkl')
+# #train_df.iloc[1:15]
+# toxic_col = train_df['toxic']
+# #toxic_col[1:15]
+# toxic_comments = train_df.loc[toxic_col == 1]
+# #toxic_comments[1:15]
+# non_toxic_comments = train_df.loc[toxic_col == 0]
+# #non_toxic_comments[1:15]
+# toxic_comments.to_pickle('toxic_comments.pkl')
+# non_toxic_comments.to_pickle('non_toxic_comments.pkl')
+
+toxic_comments_f = open('toxic_comments.pkl','rb')
+non_toxic_comments_f = open('non_toxic_comments.pkl','rb')
+
+toxic_comments = pickle.load(toxic_comments_f)
+non_toxic_comments = pickle.load(non_toxic_comments_f)
+
+toxic_comments_f.close()
+non_toxic_comments_f.close()
+
+toxic_comments = list(toxic_comments['comment_text'])
+non_toxic_comments = list(non_toxic_comments['comment_text'])
 
 
 # In[10]:
 
-all_words = []
+tox_words = []
+cln_words = []
 documents = []
 allowed_word_types = ["JJ","JJR","JJS","NN", "NNS","RB","RBR","VB","VBD", "VBG", "VBN", "VBP", "VBZ"]
-i = 0
-for p in toxic_comments['comment_text']:
-    if type(p) is not str:
-        continue
-    if i > 10000:
-        break
-    documents.append( (p, "tox") )
-    words = word_tokenize(p)
-    pos = nltk.pos_tag(words)
-    if (i % 1000 == 0):
-        print(i / 1000)
-    i = i + 1
-    for w in pos:
-        if w[1] in allowed_word_types:
-            all_words.append(w[0].lower())
+stop_words = set(stopwords.words('english'))
 
 i = 0
-for p in non_toxic_comments['comment_text']:
+for p in toxic_comments:
     if type(p) is not str:
         continue
     if i > 10000:
         break
-    documents.append( (p, "cln") )
+    documents.append((p, "tox"))
     words = word_tokenize(p)
     pos = nltk.pos_tag(words)
     if (i % 1000 == 0):
         print(i / 1000)
     i = i + 1
     for w in pos:
-        if w[1] in allowed_word_types:
-            all_words.append(w[0].lower())
+        if w[1] in allowed_word_types and w[1] not in stop_words:
+            tox_words.append(w[0].lower())
+
+i = 0
+for p in non_toxic_comments:
+    if type(p) is not str:
+        continue
+    if i > 10000:
+        break
+    documents.append((p, "cln"))
+    words = word_tokenize(p)
+    pos = nltk.pos_tag(words)
+    if (i % 1000 == 0):
+        print(i / 1000)
+    i = i + 1
+    for w in pos:
+        if w[1] in allowed_word_types and w not in stop_words:
+            cln_words.append(w[0].lower())
+
 
 
 
 
 # In[17]:
+print('length of tox comments:')
+print(len(tox_words))
 
+print('length of cln comments:')
+print(len(cln_words))
 
 
 
@@ -126,12 +125,24 @@ for p in non_toxic_comments['comment_text']:
 save_documents = open("labeled_data/documents.pickle","wb")
 pickle.dump(documents, save_documents)
 save_documents.close()
-all_words = nltk.FreqDist(all_words)
+tox_words = nltk.FreqDist(tox_words)
+cln_words = nltk.FreqDist(cln_words)
 
 
-word_features = list(all_words.keys())[:10000]
+# word_features = list(all_words.keys())[:10000]
+word_features = list(tox_words.keys())[:1000]
+# print("Tox Words:")
+# print(list(tox_words.keys())[:100])
+# print("Cln Words:")
+# print(list(cln_words.keys())[:100])
+word_features = list(set(word_features + list(cln_words.keys())[:1000]))
 
-
+print('length of word features:')
+print(len(word_features))
+print('tox word features:')
+print(word_features[:100])
+print('cln word_features')
+print(word_features[1001:1101])
 
 save_word_features = open("labeled_data/word_features5k.pickle","wb")
 pickle.dump(word_features, save_word_features)
@@ -147,24 +158,24 @@ save_word_features.close()
 # In[21]:
 
 def find_features(document):
+
     words = word_tokenize(document)
+    words = set(words)
     features = {}
     for w in word_features:
-        features[w] = (w in words)
+        features[w] = (w.lower() in words)
 
     return features
-print('complete')
+print('complete documents')
 
 
 # In[ ]:
-
-documents[:15]
-
 
 # In[ ]:
 
 #featuresets = [(find_features(comment), toxicity) for (comment, toxicity) in documents]
 featuresets = []
+
 i = 0
 for tup in documents:
     if i % 1000 == 0:
@@ -173,19 +184,24 @@ for tup in documents:
     try:
         featuresets.append((find_features(tup[0]), tup[1]))
     except:
-        print(tup[0])
-print('complete')
+        print('excepted')
+print('completed featuresets')
 
 
 random.shuffle(featuresets)
+print('length featuresets:')
 print(len(featuresets))
+
+save_featuresets = open('labeled_data/featuresets5k.pickle','wb')
+pickle.dump(featuresets, save_featuresets)
+save_featuresets.close()
 
 testing_set = featuresets[13000:]
 training_set = featuresets[:13000]
 
 classifier = nltk.NaiveBayesClassifier.train(training_set)
 print("Original Naive Bayes Algo accuracy percent:", (nltk.classify.accuracy(classifier, testing_set))*100)
-classifier.show_most_informative_features(15)
+classifier.show_most_informative_features(100)
 
 ###############
 save_classifier = open("classifiers/originalnaivebayes5k.pickle","wb")
@@ -195,7 +211,6 @@ save_classifier.close()
 
 # In[ ]:
 
-print(training_set[1:15])
 MNB_classifier = SklearnClassifier(MultinomialNB())
 MNB_classifier.train(training_set)
 print("MNB_classifier accuracy percent:", (nltk.classify.accuracy(MNB_classifier, testing_set))*100)
